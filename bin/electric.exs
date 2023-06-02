@@ -1,10 +1,8 @@
-{opts, [outpath], _} = OptionParser.parse(System.argv(), strict: [in: :string])
+{opts, _, _} = OptionParser.parse(System.argv(), strict: [in: :string, out: :string])
 source = File.read!(opts[:in])
+dest = Keyword.fetch!(opts, :out)
 
-IO.puts(
-  :stderr,
-  IO.ANSI.format(["Writing pre-processed sql file to ", :green, "#{outpath}", :reset, "\n\n"])
-)
+IO.puts("Preprocessing #{opts[:in]} and writing to #{dest}")
 
 migration =
   Regex.scan(~r/^CREATE OR REPLACE FUNCTION ([a-z_]+\()/m, source)
@@ -19,4 +17,4 @@ migration =
     )
   end)
 
-IO.puts(migration)
+File.write!(dest, migration, [])
