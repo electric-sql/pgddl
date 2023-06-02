@@ -450,7 +450,7 @@ SELECT  a.attnum AS ord,
 #else
         attoptions as options,
 #end
-	format('%I %s%s%s%s%s%s',
+	format('%I %s%s%s%s%s%s%s',
          a.attname::text,
 	 format_type(t.oid, a.atttypmod),
 #if 9.2
@@ -476,6 +476,7 @@ SELECT  a.attnum AS ord,
 	 case when a.attnotnull THEN ' NOT NULL' end
 #end
 	 ,
+    coalesce(' DEFAULT ' || pg_get_expr(def.adbin, def.adrelid), ''),
 #if 10
 	case when attidentity in ('a','d')
 	     then format(' GENERATED %s AS IDENTITY',
@@ -747,10 +748,6 @@ $function$ strict;
 -- forward declarations, will be redefined later
 ---------------------------------------------------
 
-/*
-CREATE OR REPLACE FUNCTION ddlx_grants(oid) RETURNS text
-  LANGUAGE sql AS $function$ select null::text $function$;
-*/
 CREATE OR REPLACE FUNCTION ddlx_create(oid, text[] default '{}') RETURNS text
   LANGUAGE sql AS $function$ select null::text $function$;
 
@@ -766,6 +763,17 @@ CREATE OR REPLACE FUNCTION ddlx_alter_owner(oid)
           ' OWNER TO '||quote_ident(owner)||E';\n'
    end
   from obj 
+$function$  strict;
+
+---------------------------------------------------
+
+CREATE OR REPLACE FUNCTION ddlx_table_constraints(regclass, OUT sql text)
+    RETURNS SETOF text LANGUAGE sql AS $function$
+  select
+      ('CONSTRAINT ' || quote_ident(constraint_name) || ' ' || constraint_definition) as sql
+  from @schemaname@.ddlx_get_constraints($1)
+  where is_local
+  order by constraint_type desc, constraint_name;
 $function$  strict;
 
 ---------------------------------------------------
@@ -798,9 +806,16 @@ CREATE OR REPLACE FUNCTION ddlx_create_table(regclass, text[] default '{}')
     case when reloftype>0
     then ''
     else
-    ' (' ||coalesce(E'\n' ||
-      (SELECT string_agg('    '||definition,E',\n')
-         FROM ddlx_describe($1) WHERE is_local)||E'\n','') || ')'
+    ' (' ||
+      coalesce(E'\n' ||
+        array_to_string(
+          array_cat(
+            (SELECT array_agg('    '||definition) FROM @schemaname@.ddlx_describe($1) WHERE is_local),
+            (SELECT array_agg('    '||sql) FROM @schemaname@.ddlx_table_constraints($1))
+          ),
+          E',\n'
+        ), '') || E'\n' ||  ')'
+
     end
 #if 10
   end
