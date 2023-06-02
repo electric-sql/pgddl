@@ -748,10 +748,6 @@ $function$ strict;
 -- forward declarations, will be redefined later
 ---------------------------------------------------
 
-/*
-CREATE OR REPLACE FUNCTION ddlx_grants(oid) RETURNS text
-  LANGUAGE sql AS $function$ select null::text $function$;
-*/
 CREATE OR REPLACE FUNCTION ddlx_create(oid, text[] default '{}') RETURNS text
   LANGUAGE sql AS $function$ select null::text $function$;
 
